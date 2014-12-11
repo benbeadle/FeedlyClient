@@ -1,6 +1,31 @@
 # -*- coding: UTF-8 -*-
-import requests
 import json
+
+try:
+  from google.appengine.api import urlfetch
+  import urllib, urlparse
+
+  def json_fetch(url, method, params={}, data={}, headers={}):
+    def combine_params(url, params):
+      #Add params to the url
+      url_parts = list(urlparse.urlparse(url))
+      query = dict(urlparse.parse_qsl(url_parts[4]))
+      query.update(params)
+      url_parts[4] = urllib.urlencode(query)
+      return urlparse.urlunparse(url_parts)
+
+    url = combine_params(url, params)
+
+    response = urlfetch.fetch(url, payload=json.dumps(data), method=method, headers=headers)
+    return json.loads(response.content)
+
+except:
+  import requests
+
+  def json_fetch(url, method, params={}, data={}, headers={}):
+    response = requests.request(method, url, params=params, data=json.dumps(data), headers=headers)
+    return response.json()
+
 
 class FeedlyClient(object):
     def __init__(self, **options):
@@ -39,8 +64,7 @@ class FeedlyClient(object):
                       )
         
         quest_url=self._get_endpoint('v3/auth/token')
-        res = requests.post(url=quest_url, params=params)
-        return res.json()
+        return json_fetch(quest_url, "post", params=params)
     
     def refresh_access_token(self,refresh_token):
         '''obtain a new access token by sending a refresh token to the feedly Authorization server'''
@@ -51,16 +75,14 @@ class FeedlyClient(object):
                       grant_type='refresh_token',
                       )
         quest_url=self._get_endpoint('v3/auth/token')
-        res = requests.post(url=quest_url, params=params)
-        return res.json()
+        return json_fetch(quest_url, "post", params=params)
     
     
     def get_user_subscriptions(self,access_token):
         '''return list of user subscriptions'''
         headers = {'Authorization': 'OAuth '+access_token}
         quest_url=self._get_endpoint('v3/subscriptions')
-        res = requests.get(url=quest_url, headers=headers)
-        return res.json()
+        return json_fetch(quest_url, "get", headers=headers)
     
     def get_feed_content(self,access_token,streamId,unreadOnly,newerThan):
         '''return contents of a feed'''
@@ -71,8 +93,7 @@ class FeedlyClient(object):
                       unreadOnly=unreadOnly,
                       newerThan=newerThan
                       )
-        res = requests.get(url=quest_url, params=params,headers=headers)
-        return res.json()
+        return json_fetch(quest_url, "get", params=params, headers=headers)
     
     def mark_article_read(self, access_token, entryIds):
         '''Mark one or multiple articles as read'''
@@ -85,8 +106,7 @@ class FeedlyClient(object):
                       type="entries",
                       entryIds=entryIds,
                       )
-        res = requests.post(url=quest_url, data=json.dumps(params), headers=headers)
-        return res
+        return json_fetch(quest_url, "post", data=params, headers=headers)
     
     def save_for_later(self, access_token, user_id, entryIds):
         '''saved for later.entryIds is a list for entry id.'''
@@ -95,11 +115,8 @@ class FeedlyClient(object):
         }
         request_url = self._get_endpoint('v3/tags') + '/user%2F' + user_id + '%2Ftag%2Fglobal.saved'
         
-        params = dict(
-                      entryIds=entryIds
-                      )
-        res = requests.put(url=request_url, data=json.dumps(params), headers=headers)
-        return res  	
+        params = dict(entryIds=entryIds)
+        return json_fetch(request_url, "put", data=params, headers=headers)
 
     def _get_endpoint(self, path=None):
         url = "https://%s" % (self.service_host)
