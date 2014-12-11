@@ -117,6 +117,15 @@ class FeedlyClient(object):
         
         params = dict(entryIds=entryIds)
         return json_fetch(request_url, "put", data=params, headers=headers)
+    
+    def get_user_profile(self, access_token):
+        '''return user's profile'''
+        headers = {'content-type': 'application/json',
+                   'Authorization': 'OAuth ' + access_token
+        }
+        request_url = self._get_endpoint('/v3/profile')
+        
+        return json_fetch(request_url, "get", headers=headers)
 
     def _get_endpoint(self, path=None):
         url = "https://%s" % (self.service_host)
